@@ -12,7 +12,9 @@ function TinySDF(fontSize, buffer, radius, cutoff, fontFamily, fontWeight) {
     this.fontFamily = fontFamily || 'sans-serif';
     this.fontWeight = fontWeight || 'normal';
     this.radius = radius || 8;
-    var size = this.size = this.fontSize + this.buffer * 2;
+
+    var size = this.fontSize + this.radius * 2 + this.buffer * 2;
+    this.size = size;
 
     this.canvas = document.createElement('canvas');
     this.canvas.width = this.canvas.height = size;
@@ -30,13 +32,24 @@ function TinySDF(fontSize, buffer, radius, cutoff, fontFamily, fontWeight) {
     this.z = new Float64Array(size + 1);
     this.v = new Int16Array(size);
 
-    // hack around https://bugzilla.mozilla.org/show_bug.cgi?id=737852
-    this.middle = Math.round((size / 2) * (navigator.userAgent.indexOf('Gecko/') >= 0 ? 1.2 : 1));
+    this.middle = Math.round(size / 2);
 }
 
 TinySDF.prototype.draw = function (char) {
+    var inner = {
+        x: this.radius + this.buffer,
+        y: this.radius + this.buffer,
+        width: this.ctx.measureText(char).width,
+        height: this.fontSize
+    };
+    var outer = {
+        x: this.buffer,
+        y: this.buffer,
+        width: inner.width + 2 * this.radius,
+        height: inner.height + 2 * this.radius
+    };
     this.ctx.clearRect(0, 0, this.size, this.size);
-    this.ctx.fillText(char, this.buffer, this.middle);
+    this.ctx.fillText(char, inner.x, this.middle);
 
     var imgData = this.ctx.getImageData(0, 0, this.size, this.size);
     var alphaChannel = new Uint8ClampedArray(this.size * this.size);
@@ -55,7 +68,14 @@ TinySDF.prototype.draw = function (char) {
         alphaChannel[i] = Math.max(0, Math.min(255, Math.round(255 - 255 * (d / this.radius + this.cutoff))));
     }
 
-    return alphaChannel;
+    return {
+        char: char,
+        data: alphaChannel,
+        inner: inner,
+        outer: outer,
+        width: this.size,
+        height: this.size
+    };
 };
 
 // 2D Euclidean distance transform by Felzenszwalb & Huttenlocher https://cs.brown.edu/~pff/papers/dt-final.pdf
